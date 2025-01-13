@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="co.kr.mayfarm.seoulinstitutemanager.repository.CollectRepository">
+    <select id="searchCollection" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.CollectDto$SearchRequest" resultType="co.kr.mayfarm.seoulinstitutemanager.dto.CollectDto$SearchResponse">
+        SELECT 
+            id, 
+            source_board, 
+            source_category, 
+            title, 
+            content, 
+            status, 
+            writed_at, 
+            created_at
+        FROM 
+            collected_data
+        WHERE 
+            reported=0
+            <if test="dto.source != null and dto.source != ''">
+                AND source_board=#{dto.source}
+            </if>
+            <if test="dto.status != null and dto.status != ''">
+                AND status=#{dto.status}
+            </if>
+            <if test="dto.query != null and dto.query != ''">
+                AND (title LIKE '%${dto.query}%' OR content LIKE '%${dto.query}%')
+            </if>
+            <if test="dto.startDate != null and dto.startDate != ''">
+                AND (created_at <![CDATA[ >= ]]> #{dto.startDate}
+                OR writed_at <![CDATA[ >= ]]> #{dto.startDate})
+            </if>
+            <if test="dto.endDate != null and dto.endDate != ''">
+                AND (created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59'
+                OR writed_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59')
+            </if>
+        ORDER BY created_at DESC
+        <if test="dto.isLimit == true">
+            LIMIT 10
+            OFFSET ${(dto.page - 1) * dto.pageSize}
+        </if>
+    </select>
+
+    <select id="getSearchCollectionCount" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.CollectDto$SearchRequest">
+        SELECT 
+            count(*) as total_count
+        FROM 
+            collected_data
+        WHERE 
+            reported=0
+            <if test="dto.source != null and dto.source != ''">
+                AND source_board=#{dto.source}
+            </if>
+            <if test="dto.status != null and dto.status != ''">
+                AND status=#{dto.status}
+            </if>
+            <if test="dto.query != null and dto.query != ''">
+                AND (title LIKE '%${dto.query}%' OR content LIKE '%${dto.query}%')
+            </if>
+        <if test="dto.startDate != null and dto.startDate != ''">
+            AND (created_at <![CDATA[ >= ]]> #{dto.startDate}
+            OR writed_at <![CDATA[ >= ]]> #{dto.startDate})
+        </if>
+        <if test="dto.endDate != null and dto.endDate != ''">
+            AND (created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59'
+            OR writed_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59')
+        </if>
+    </select>
+
+    <select id="downloadCollections" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.CollectDto$SearchRequest">
+        SELECT
+            *
+        FROM
+            collected_data
+        WHERE
+        reported=0
+        <if test="dto.source != null and dto.source != ''">
+            AND source_board=#{dto.source}
+        </if>
+        <if test="dto.status != null and dto.status != ''">
+            AND status=#{dto.status}
+        </if>
+        <if test="dto.query != null and dto.query != ''">
+            AND (title LIKE '%${dto.query}%' OR content LIKE '%${dto.query}%')
+        </if>
+        <if test="dto.startDate != null and dto.startDate != ''">
+            AND (created_at <![CDATA[ >= ]]> #{dto.startDate}
+            OR writed_at <![CDATA[ >= ]]> #{dto.startDate})
+        </if>
+        <if test="dto.endDate != null and dto.endDate != ''">
+            AND (created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59'
+            OR writed_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59')
+        </if>
+        ORDER BY created_at DESC
+    </select>
+
+</mapper>

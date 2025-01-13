@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="co.kr.mayfarm.seoulinstitutemanager.repository.AnalyzeRepository">
+    <resultMap id="analysesMap" type="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$Analyses" autoMapping="true">
+        <result property="total_count" column="total_count"/>
+        <collection property="analyses" ofType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$Analysis" autoMapping="true"/>
+    </resultMap>
+    <select id="searchAnalyses" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$SearchRequest" resultMap="analysesMap">
+        SELECT
+            COUNT(*) OVER() as total_count,
+            analysis.id as id,
+            analysis.status as status,
+            analysis_dictionary.analyzed_type_code,
+            analyzed_type_big,
+            analyzed_type_middle,
+            analyzed_time,
+            analyzed_place_addr,
+            analyzed_place_x,
+            analyzed_place_y,
+            title,
+            content,
+            source_board,
+            reported,
+            collection.created_at as collected_at,
+            analysis.created_at as analyzed_at
+        FROM
+            analyzed_data AS analysis
+            LEFT JOIN collected_data AS collection
+            ON analysis.collect_id = collection.id
+            LEFT JOIN
+                (SELECT
+                    analyzed_data_id,
+                    crime_type_code as analyzed_type_code,
+                    category_big as analyzed_type_big,
+                    category_middle as analyzed_type_middle
+                FROM
+--                     (SELECT
+--                         analyzed_data_id, crime_type_code
+--                     FROM analyzed_crime_type GROUP BY analyzed_data_id) AS analysis_type
+                    analyzed_crime_type AS analysis_type
+                    LEFT JOIN (SELECT DISTINCT category_code, category_big, category_middle FROM crime_dictionary) AS crime_dictionary
+                    ON analysis_type.crime_type_code = crime_dictionary.category_code
+                GROUP BY analyzed_data_id) AS analysis_dictionary
+            ON analysis.id = analysis_dictionary.analyzed_data_id
+        WHERE
+            collection.status='분석결과있음'
+            <if test="dto.crime_category_big != null and dto.crime_category_big != ''">
+                AND analyzed_type_big=#{dto.crime_category_big}
+            </if>
+            <if test="dto.crime_category_code != null and dto.crime_category_code != ''">
+                AND analysis_dictionary.analyzed_type_code=#{dto.crime_category_code}
+            </if>
+            <if test="dto.analyzed_place_addr != null and dto.analyzed_place_addr != ''">
+                AND analyzed_place_addr LIKE '%${dto.analyzed_place_addr}%'
+            </if>
+            <if test="dto.status != null and dto.status != ''">
+                AND analysis.status=#{dto.status}
+            </if>
+            <if test="dto.query != null and dto.query != ''">
+                AND (title LIKE '%${dto.query}%' OR content LIKE '%${dto.query}%')
+            </if>
+        <if test="dto.startDate != null and dto.startDate != ''">
+            AND (collection.created_at <![CDATA[ >= ]]>#{dto.startDate}
+            OR analysis.created_at <![CDATA[ >= ]]>#{dto.startDate})
+        </if>
+        <if test="dto.endDate != null and dto.endDate != ''">
+            AND (collection.created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59'
+            OR analysis.created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59')
+        </if>
+        ORDER BY analysis.created_at DESC
+        LIMIT 10
+        OFFSET #{dto.offset}
+    </select>
+
+    <select id="searchNewAnalyses" resultMap="analysesMap">
+        SELECT
+        COUNT(*) OVER() as total_count,
+        history.read,
+        analysis.id as id,
+        analysis.status as status,
+        analysis_dictionary.analyzed_type_code,
+        analyzed_type_big,
+        analyzed_type_middle,
+        analyzed_time,
+        analyzed_place_addr,
+        analyzed_place_x,
+        analyzed_place_y,
+        title,
+        content,
+        source_board,
+        reported,
+        collection.created_at AS collected_at,
+        analysis.created_at AS analyzed_at
+        FROM history
+            LEFT JOIN
+                (analyzed_data AS analysis
+                LEFT JOIN collected_data AS collection
+                ON analysis.collect_id = collection.id
+                LEFT JOIN
+                (SELECT
+                     analyzed_data_id,
+                     crime_type_code as analyzed_type_code,
+                     category_big as analyzed_type_big,
+                     category_middle as analyzed_type_middle
+                 FROM
+--                      (SELECT
+--                           analyzed_data_id, crime_type_code
+--                       FROM analyzed_crime_type GROUP BY analyzed_data_id) AS analysis_type
+                    analyzed_crime_type AS analysis_type
+                    LEFT JOIN (SELECT DISTINCT category_code, category_big, category_middle FROM crime_dictionary) AS crime_dictionary
+                    ON analysis_type.crime_type_code = crime_dictionary.category_code
+                GROUP BY analyzed_data_id) AS analysis_dictionary
+                ON analysis.id = analysis_dictionary.analyzed_data_id)
+            ON history.analyzed_data_id = analysis.id
+        WHERE analysis.status='대기'
+        ORDER BY analysis.created_at DESC
+        LIMIT 10
+        OFFSET ${(page-1)*10}
+    </select>
+
+    <select id="getNotices" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$SearchRequest" resultMap="analysesMap">
+        SELECT
+        COUNT(*) OVER() as total_count,
+        analysis.id as id,
+        analysis_dictionary.analyzed_type_code,
+        analyzed_type_big,
+        analyzed_type_middle,
+        analyzed_time,
+        analyzed_place_addr,
+        analyzed_place_x,
+        analyzed_place_y,
+        title,
+        content,
+        source_board,
+        reported,
+        collection.created_at as collected_at,
+        analysis.created_at as analyzed_at
+        FROM
+        (SELECT
+        analyzed_data_id,
+        crime_type_code as analyzed_type_code,
+        category_big as analyzed_type_big,
+        category_middle as analyzed_type_middle
+        FROM
+        analyzed_crime_type AS analysis_type
+        LEFT JOIN (SELECT DISTINCT category_code, category_big, category_middle FROM crime_dictionary) AS crime_dictionary
+        ON analysis_type.crime_type_code = crime_dictionary.category_code
+        GROUP BY analyzed_data_id) AS analysis_dictionary
+        LEFT JOIN analyzed_data AS analysis
+        ON analysis.id = analysis_dictionary.analyzed_data_id
+        LEFT JOIN collected_data AS collection
+        ON analysis.collect_id = collection.id
+        WHERE
+        collection.status='분석결과있음'
+        <if test="dto.crime_category_big != null and dto.crime_category_big != ''">
+            AND analyzed_type_big=#{dto.crime_category_big}
+        </if>
+        <if test="dto.crime_category_code != null and dto.crime_category_code != ''">
+            AND analysis_dictionary.analyzed_type_code=#{dto.crime_category_code}
+        </if>
+        <if test="dto.analyzed_place_addr != null and dto.analyzed_place_addr != ''">
+            AND analyzed_place_addr LIKE '%${dto.analyzed_place_addr}%'
+        </if>
+        <if test="dto.status != null and dto.status != ''">
+            AND analysis.status=#{dto.status}
+        </if>
+        <if test="dto.query != null and dto.query != ''">
+            AND (title LIKE '%${dto.query}%' OR content LIKE '%${dto.query}%')
+        </if>
+        <if test="dto.startDate != null and dto.startDate != ''">
+            AND (collection.created_at <![CDATA[ >= ]]>#{dto.startDate}
+            OR analysis.created_at <![CDATA[ >= ]]>#{dto.startDate})
+        </if>
+        <if test="dto.endDate != null and dto.endDate != ''">
+            AND (collection.created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59'
+            OR analysis.created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59')
+        </if>
+        ORDER BY analysis.created_at DESC
+        LIMIT 10
+        OFFSET #{dto.offset}
+    </select>
+
+    <select id="getAnalysisDetail" resultType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$AnalysisDetailVO">
+        SELECT
+            analysis.id as id,
+            analysis.collect_id as collect_id,
+            analysis.status as status,
+            analysis_dictionary.analyzed_type_code as analyzed_type_code,
+            analyzed_type2,
+            analyzed_type3,
+            analyzed_type_big,
+            analyzed_type_middle,
+            analyzed_time,
+            analyzed_place_addr,
+            analyzed_place_x,
+            analyzed_place_y,
+            analyzed_target,
+            analyzed_action,
+            collect_keyword,
+            title,
+            content,
+            source_board,
+            image_file_name as image_file_names,
+            image_file_origin as image_file_origins,
+            image_url as image_urls,
+            writed_at,
+            collection.created_at AS collected_at,
+            analysis.created_at AS analyzed_at,
+            ocr_result,
+            reported
+        FROM
+            (SELECT * FROM analyzed_data WHERE id = #{id}) AS analysis
+            LEFT JOIN collected_data AS collection
+            ON analysis.collect_id = collection.id
+            LEFT JOIN (
+                SELECT
+                    a.analyzed_data_id,
+                    a.crime_type_code AS analyzed_type_code,
+                    c2.category_middle AS analyzed_type2,
+                    c3.category_middle AS analyzed_type3,
+                    d.category_big AS analyzed_type_big,
+                    d.category_middle AS analyzed_type_middle
+                FROM
+                    (SELECT * FROM analyzed_crime_type WHERE analyzed_data_id = #{id}) AS a
+                    LEFT JOIN (select * from crime_dictionary group by category_code) AS d
+                    ON a.crime_type_code = d.category_code
+                    LEFT JOIN (select * from crime_dictionary group by category_code) AS c2
+                    ON a.crime_type_code2 = c2.category_code
+                    LEFT JOIN (select * from crime_dictionary group by category_code) AS c3
+                    ON a.crime_type_code3 = c3.category_code) AS analysis_dictionary
+            ON analysis.id = analysis_dictionary.analyzed_data_id;
+--             LEFT JOIN
+--                 (SELECT
+--                     analyzed_data_id,
+--                     crime_type_code AS analyzed_type_code,
+--                     category_big AS analyzed_type_big,
+--                     category_middle AS analyzed_type_middle
+--                 FROM
+--                     (SELECT
+--                          analyzed_data_id, crime_type_code
+--                      FROM analyzed_crime_type GROUP BY analyzed_data_id HAVING analyzed_data_id = #{id}) AS analysis_type
+--                     LEFT JOIN (SELECT DISTINCT category_code, category_big, category_middle FROM crime_dictionary) AS crime_dictionary
+--                     ON analysis_type.crime_type_code = crime_dictionary.category_code
+--                 GROUP BY analyzed_data_id
+--                 HAVING analyzed_data_id = #{id}) AS analysis_dictionary
+--             ON analysis.id = analysis_dictionary.analyzed_data_id;
+    </select>
+
+    <insert id="insertAnalysis" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$AddRequest">
+        INSERT 
+        INTO analyzed_data(
+            <if test="dto.time != null and dto.time != ''">
+                analyzed_time,
+            </if>
+            <if test="dto.place_addr != null and dto.place_addr != ''">
+                analyzed_place_addr,
+            </if>
+            <if test="dto.place_x != null and dto.place_x != ''">
+                analyzed_place_x,
+            </if>
+            <if test="dto.place_y != null and dto.place_y != ''">
+                analyzed_place_y,
+            </if>
+            <if test="dto.admin_comment != null and dto.admin_comment != ''">
+                admin_comment,
+            </if>
+            status,
+            collect_id
+        )
+        VALUES(
+            <if test="dto.time != null and dto.time != ''">
+                #{dto.time},
+            </if>
+            <if test="dto.place_addr != null and dto.place_addr != ''">
+                #{dto.place_addr},
+            </if>
+            <if test="dto.place_x != null and dto.place_x != ''">
+                #{dto.place_x},
+            </if>
+            <if test="dto.place_y != null and dto.place_y != ''">
+                #{dto.place_y},
+            </if>
+            <if test="dto.admin_comment != null and dto.admin_comment != ''">
+                #{dto.admin_comment},
+            </if>
+            #{dto.status},
+            #{dto.collect_id}
+        )
+    </insert>
+
+    <update id="updateAnalysis" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$UpdateRequest">
+        UPDATE 
+            analyzed_data
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="dto.status != null and dto.status != ''">
+                status=#{dto.status},
+            </if>
+            <if test="dto.time != null and dto.time != ''">
+                analyzed_time=#{dto.time},
+            </if>
+            <if test="dto.place_addr != null and dto.place_addr != ''">
+                analyzed_place_addr=#{dto.place_addr},
+            </if>
+            <if test="dto.place_x != null and dto.place_x != ''">
+                analyzed_place_x=#{dto.place_x},
+            </if>
+            <if test="dto.place_y != null and dto.place_y != ''">
+                analyzed_place_y=#{dto.place_y},
+            </if>
+            <if test="dto.admin_comment != null and dto.admin_comment != ''">
+                admin_comment=#{dto.admin_comment},
+            </if>
+            <if test="dto.id != null and dto.id != 0">
+                id=#{dto.id},
+            </if>
+            <if test="dto.collect_id != null and dto.collect_id != 0">
+                collect_id=#{dto.collect_id}
+            </if>
+        </trim>
+        WHERE
+            1=1
+            <if test="dto.id != null and dto.id != 0">
+                and id=#{dto.id}
+            </if>
+            <if test="dto.collect_id != null and dto.collect_id != 0">
+                and collect_id=#{dto.collect_id}
+            </if>
+    </update>
+
+    <select id="getCrimeTypeStats" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$SearchRequest" resultType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$CTStats">
+        SELECT
+        analysis_dictionary.analyzed_type_code as crimeCode,
+        count(*) as number
+        FROM
+        analyzed_data AS analysis
+        JOIN
+        collected_data AS collection ON analysis.collect_id = collection.id
+        LEFT JOIN
+        (SELECT
+        analyzed_data_id,
+        GROUP_CONCAT(DISTINCT crime_type_code) AS analyzed_type_code
+        FROM
+        (SELECT
+        analyzed_data_id, crime_type_code
+        FROM
+        analyzed_crime_type) AS analysis_type
+        JOIN crime_dictionary ON analysis_type.crime_type_code = crime_dictionary.category_code
+        GROUP BY analyzed_data_id) AS analysis_dictionary ON analysis.id = analysis_dictionary.analyzed_data_id
+        WHERE
+        analysis.status = '승인'
+        <if test="dto.analyzed_place_addr != null and dto.analyzed_place_addr != ''">
+            AND analyzed_place_addr LIKE '%${dto.analyzed_place_addr}%'
+        </if>
+        <if test="dto.crime_category_code != null and dto.crime_category_code != ''">
+            AND analysis_dictionary.analyzed_type_code=#{dto.crime_category_code}
+        </if>
+        <if test="dto.startDate != null and dto.startDate != ''">
+            AND (collection.created_at <![CDATA[ >= ]]>#{dto.startDate}
+            OR analysis.created_at <![CDATA[ >= ]]>#{dto.startDate})
+        </if>
+        <if test="dto.endDate != null and dto.endDate != ''">
+            AND (collection.created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59'
+            OR analysis.created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59')
+        </if>
+        GROUP BY analysis_dictionary.analyzed_type_code
+    </select>
+</mapper>

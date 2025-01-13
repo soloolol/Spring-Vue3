@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="lang">
+  <head>
+    <title>Seoul-Institute-Manager</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0" />
+  </head>
+  <script type="text/javascript">
+    document.cookie = "safeCookie1=foo; SameSite=Lax";
+    document.cookie = "safeCookie2=foo";
+    document.cookie = "crossCookie=bar; SameSite=None; Secure";
+  </script>
+  <body id="app">
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

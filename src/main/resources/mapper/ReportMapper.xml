@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="co.kr.mayfarm.seoulinstitutemanager.repository.ReportRepository">
+    <select id="searchReport" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.ReportDto$SearchRequest" resultType="co.kr.mayfarm.seoulinstitutemanager.dto.ReportDto$SearchResponse">
+        SELECT 
+            collected_data.id, 
+            source_url,
+            content, 
+            collected_data.status,
+            analyzed_data.status as analyzed_status,
+            admin_comment,
+            collected_data.created_at as reported_at, 
+            analyzed_data.created_at as analyzed_at,
+            analyzed_data.updated_at
+        FROM 
+            `collected_data`
+                LEFT JOIN `analyzed_data`
+                    ON collected_data.id=analyzed_data.collect_id
+        WHERE 
+            reported=1
+            <if test="dto.status != null and dto.status != ''">
+                AND collected_data.status=#{dto.status}
+            </if>
+            <if test="dto.query != null and dto.query != ''">
+                AND (title LIKE '%${dto.query}%' OR content LIKE '%${dto.query}%')
+            </if>
+            <if test="dto.startDate != null and dto.startDate != ''">
+                AND collected_data.created_at <![CDATA[ >= ]]>#{dto.startDate}
+            </if>
+            <if test="dto.endDate != null and dto.endDate != ''">
+                AND collected_data.created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59'
+            </if>
+        ORDER BY analyzed_data.created_at DESC
+        LIMIT 10
+        OFFSET #{dto.offset}
+    </select>
+
+    <select id="getSearchReportCount" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.ReportDto$SearchRequest">
+        SELECT 
+            count(*) as total_count
+        FROM 
+            `collected_data`
+                LEFT JOIN `analyzed_data`
+                    ON collected_data.id=analyzed_data.collect_id
+        WHERE 
+            reported=1
+            <if test="dto.status != null and dto.status != ''">
+                AND collected_data.status=#{dto.status}
+            </if>
+            <if test="dto.query != null and dto.query != ''">
+                AND (title LIKE '%${dto.query}%' OR content LIKE '%${dto.query}%')
+            </if>
+            <if test="dto.startDate != null and dto.startDate != ''">
+                AND collected_data.created_at <![CDATA[ >= ]]>#{dto.startDate}
+            </if>
+            <if test="dto.endDate != null and dto.endDate != ''">
+                AND collected_data.created_at <![CDATA[ <= ]]> '${dto.endDate} 23:59:59'
+            </if>
+    </select>
+
+    <select id="getReportDetail" resultType="co.kr.mayfarm.seoulinstitutemanager.dto.ReportDto$ReportDetailVO">
+        SELECT
+            collected_data.id,
+            analyzed_data.id as analyzed_id,
+            collected_data.status,
+            cd.category_big as category_big,
+            cd.category_middle as category_middle,
+            cd.category_code as category_code,
+            analyzed_time,
+            analyzed_place_addr,
+            analyzed_place_x,
+            analyzed_place_y,
+            source_url,
+            content,
+            admin_comment,
+            image_file_origin as image_file_origins,
+            image_file_name as image_file_names,
+            image_url as image_urls,
+            collected_data.created_at as reported_at,
+            analyzed_data.created_at as analyzed_at,
+            analyzed_data.updated_at
+        FROM collected_data
+                 LEFT JOIN analyzed_data
+                           ON analyzed_data.collect_id = collected_data.id
+                 LEFT JOIN analyzed_crime_type
+                           ON analyzed_data.id = analyzed_crime_type.analyzed_data_id
+                 LEFT JOIN (
+            SELECT
+                category_code, category_big, category_middle
+            FROM
+                crime_dictionary
+            GROUP BY category_code) as cd
+                           ON(cd.category_code = analyzed_crime_type.crime_type_code)
+        WHERE
+            collected_data.id=#{id}
+    </select>
+
+    <update id="updateReport" parameterType="co.kr.mayfarm.seoulinstitutemanager.dto.AnalyzeDto$UpdateRequest">
+        UPDATE
+        collected_data
+        <trim prefix="SET" suffixOverrides=",">
+
+            image_file_name=#{dto.image_file_name},
+
+            image_file_origin=#{dto.image_file_origin},
+
+            image_url=#{dto.image_url},
+
+            image_file_path=#{dto.image_file_path}
+
+        </trim>
+        WHERE
+        id = #{dto.collect_id}
+    </update>
+
+</mapper>
